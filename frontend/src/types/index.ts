@@ -233,6 +233,7 @@ export interface DashboardStats {
   total_skills_count: number;
   top_matched_role?: string;
   recent_activities: Array<{
+    id?: string;
     type: string;
     title: string;
     timestamp: string;

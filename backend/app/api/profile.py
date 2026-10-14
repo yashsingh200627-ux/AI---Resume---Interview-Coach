@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
+from datetime import datetime
+import uuid
 from app.database.session import get_db
 from app.models.models import (
     User, Profile, Education, Experience, Skill, Project, Certification
@@ -89,8 +91,17 @@ def update_profile(
 ):
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
     if not profile:
-        profile = Profile(user_id=current_user.id)
+        profile = Profile(
+            id=str(uuid.uuid4()),
+            user_id=current_user.id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
         db.add(profile)
+    else:
+        if not getattr(profile, "id", None):
+            profile.id = str(uuid.uuid4())
+        profile.updated_at = datetime.utcnow()
 
     profile_data = profile_in.model_dump(exclude_unset=True)
     

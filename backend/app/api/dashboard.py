@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from datetime import datetime
+from typing import Any
 from app.database.session import get_db
 from app.models.models import (
     User, Profile, Education, Experience, Skill, Project, Certification,
@@ -78,50 +80,89 @@ def get_dashboard_stats(current_user: User = Depends(get_current_user), db: Sess
     top_matched_role = latest_match.job_description.title if (latest_match and latest_match.job_description) else current_user.target_job_role
 
     # 7. Recent activities (chronological from DB)
+    cleared_at = getattr(current_user, "activity_cleared_at", None)
+    if isinstance(cleared_at, str):
+        try:
+            cleared_at = datetime.fromisoformat(cleared_at.replace("Z", "+00:00"))
+        except Exception:
+            cleared_at = None
+
+    raw_hidden = getattr(current_user, "hidden_activity_ids", None) or []
+    hidden_ids = set(raw_hidden if isinstance(raw_hidden, list) else [])
+
+    def is_visible(act_id: str, ts: Any) -> bool:
+        if act_id in hidden_ids:
+            return False
+        if cleared_at and ts:
+            ts_dt = ts
+            if isinstance(ts_dt, str):
+                try:
+                    ts_dt = datetime.fromisoformat(ts_dt.replace("Z", "+00:00"))
+                except Exception:
+                    pass
+            if isinstance(ts_dt, datetime):
+                ts_naive = ts_dt.replace(tzinfo=None)
+                cl_naive = cleared_at.replace(tzinfo=None) if isinstance(cleared_at, datetime) else None
+                if cl_naive and ts_naive <= cl_naive:
+                    return False
+        return True
+
     activities = []
     
     # Recent resumes
-    recent_resumes = db.query(Resume).filter(Resume.user_id == current_user.id).order_by(Resume.created_at.desc()).limit(3).all()
+    recent_resumes = db.query(Resume).filter(Resume.user_id == current_user.id).order_by(Resume.created_at.desc()).limit(10).all()
     for r in recent_resumes:
-        activities.append({
-            "type": "resume_created",
-            "title": f"Created Resume: {r.title}",
-            "timestamp": r.created_at,
-            "badge": "Resume"
-        })
+        r_id = str(getattr(r, "id", None) or getattr(r, "_id", ""))
+        if is_visible(r_id, r.created_at):
+            activities.append({
+                "id": r_id,
+                "type": "resume_created",
+                "title": f"Created Resume: {r.title}",
+                "timestamp": r.created_at,
+                "badge": "Resume"
+            })
 
     # Recent analyses
-    recent_analyses = db.query(ResumeAnalysis).filter(ResumeAnalysis.user_id == current_user.id).order_by(ResumeAnalysis.created_at.desc()).limit(3).all()
+    recent_analyses = db.query(ResumeAnalysis).filter(ResumeAnalysis.user_id == current_user.id).order_by(ResumeAnalysis.created_at.desc()).limit(10).all()
     for a in recent_analyses:
-        activities.append({
-            "type": "resume_analyzed",
-            "title": f"Resume Evaluated: Score {a.overall_score}%",
-            "timestamp": a.created_at,
-            "badge": "Analysis"
-        })
+        a_id = str(getattr(a, "id", None) or getattr(a, "_id", ""))
+        if is_visible(a_id, a.created_at):
+            activities.append({
+                "id": a_id,
+                "type": "resume_analyzed",
+                "title": f"Resume Evaluated: Score {a.overall_score}%",
+                "timestamp": a.created_at,
+                "badge": "Analysis"
+            })
 
     # Recent matches
-    recent_matches = db.query(JobMatch).filter(JobMatch.user_id == current_user.id).order_by(JobMatch.created_at.desc()).limit(3).all()
+    recent_matches = db.query(JobMatch).filter(JobMatch.user_id == current_user.id).order_by(JobMatch.created_at.desc()).limit(10).all()
     for m in recent_matches:
-        activities.append({
-            "type": "job_match",
-            "title": f"ATS Match Scan: {m.overall_match_score}% Match",
-            "timestamp": m.created_at,
-            "badge": "ATS Match"
-        })
+        m_id = str(getattr(m, "id", None) or getattr(m, "_id", ""))
+        if is_visible(m_id, m.created_at):
+            activities.append({
+                "id": m_id,
+                "type": "job_match",
+                "title": f"ATS Match Scan: {m.overall_match_score}% Match",
+                "timestamp": m.created_at,
+                "badge": "ATS Match"
+            })
 
     # Recent interviews
-    recent_sessions = db.query(InterviewSession).filter(InterviewSession.user_id == current_user.id).order_by(InterviewSession.created_at.desc()).limit(3).all()
+    recent_sessions = db.query(InterviewSession).filter(InterviewSession.user_id == current_user.id).order_by(InterviewSession.created_at.desc()).limit(10).all()
     for s in recent_sessions:
-        activities.append({
-            "type": "interview_session",
-            "title": f"{s.interview_type} Interview Practice ({s.status})",
-            "timestamp": s.created_at,
-            "badge": "Interview"
-        })
+        s_id = str(getattr(s, "id", None) or getattr(s, "_id", ""))
+        if is_visible(s_id, s.created_at):
+            activities.append({
+                "id": s_id,
+                "type": "interview_session",
+                "title": f"{s.interview_type} Interview Practice ({s.status})",
+                "timestamp": s.created_at,
+                "badge": "Interview"
+            })
 
     # Sort activities by timestamp descending
-    activities.sort(key=lambda x: x["timestamp"] if x["timestamp"] else 0, reverse=True)
+    activities.sort(key=lambda x: str(x["timestamp"] if x["timestamp"] else ""), reverse=True)
     recent_activities = activities[:6]
 
     return {
@@ -136,3 +177,49 @@ def get_dashboard_stats(current_user: User = Depends(get_current_user), db: Sess
         "recent_activities": recent_activities,
         "skill_categories_breakdown": categories_breakdown
     }
+
+
+@router.delete("/activities")
+def clear_all_activities(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    now = datetime.utcnow()
+    current_user.activity_cleared_at = now
+    current_user.hidden_activity_ids = []
+    db.add(current_user)
+    db.commit()
+
+    if hasattr(db, "get_collection"):
+        col = db.get_collection("users")
+        if col is not None:
+            col.update_one(
+                {"$or": [{"id": current_user.id}, {"_id": current_user.id}]},
+                {"$set": {"activity_cleared_at": now.isoformat(), "hidden_activity_ids": []}}
+            )
+    return {"message": "All recent activities cleared successfully"}
+
+
+@router.delete("/activities/{activity_id}")
+def delete_single_activity(
+    activity_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    hidden = getattr(current_user, "hidden_activity_ids", None) or []
+    if not isinstance(hidden, list):
+        hidden = []
+    if activity_id not in hidden:
+        hidden = list(hidden) + [activity_id]
+    current_user.hidden_activity_ids = hidden
+    db.add(current_user)
+    db.commit()
+
+    if hasattr(db, "get_collection"):
+        col = db.get_collection("users")
+        if col is not None:
+            col.update_one(
+                {"$or": [{"id": current_user.id}, {"_id": current_user.id}]},
+                {"$addToSet": {"hidden_activity_ids": activity_id}}
+            )
+    return {"message": "Activity removed successfully", "activity_id": activity_id}

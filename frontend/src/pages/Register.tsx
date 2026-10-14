@@ -8,6 +8,7 @@ import { authApi } from '../services/api';
 import { Bot, Mail, Lock, User, Phone, Briefcase, GraduationCap, ArrowRight, Loader2 } from 'lucide-react';
 import { ToastContainer } from '../components/ToastContainer';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { PhoneInputField } from '../components/PhoneInputField';
 
 interface RegisterFormInputs {
   full_name: string;
@@ -19,7 +20,7 @@ interface RegisterFormInputs {
 }
 
 export const Register: React.FC = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<RegisterFormInputs>({
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<RegisterFormInputs>({
     defaultValues: {
       experience_level: 'Mid-Level',
       target_job_role: 'Full Stack Developer',
@@ -134,18 +135,11 @@ export const Register: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-[#FFF5F7] mb-1.5">
-                  Phone Number
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 dark:text-pink-300/50 absolute left-3.5 top-3.5" />
-                  <input
-                    type="tel"
-                    {...register('phone')}
-                    placeholder="+1 (555) 000-0000"
-                    className="w-full bg-white dark:bg-[#1e131b] border border-slate-300 dark:border-[#3b2536] rounded-xl pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-[#FFF5F7] placeholder-slate-400 dark:placeholder-pink-300/40 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
-                  />
-                </div>
+                <PhoneInputField
+                  label="Phone Number"
+                  value={watch('phone') || ''}
+                  onChange={(val) => setValue('phone', val, { shouldDirty: true })}
+                />
               </div>
             </div>
 

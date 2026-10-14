@@ -24,6 +24,8 @@ class User(Base):
     target_job_role = Column(String(255), default="Software Engineer")
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
     updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now)
+    activity_cleared_at = Column(DateTime(timezone=True), nullable=True)
+    hidden_activity_ids = Column(JSON, default=list, nullable=True)
 
     # Relationships
     profile = relationship("Profile", back_populates="user", uselist=False, cascade="all, delete-orphan")

@@ -4,7 +4,7 @@ import {
   JobMatch, InterviewSession, STARAnalysisResult, DashboardStats, SettingsStatus
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://ai-resume-interview-coach-1-rovp.onrender.com/api.';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -155,6 +155,8 @@ export const careerApi = {
 
 export const dashboardApi = {
   getStats: () => api.get<DashboardStats>('/dashboard/stats'),
+  clearAllActivities: () => api.delete('/dashboard/activities'),
+  deleteActivity: (id: string) => api.delete(`/dashboard/activities/${id}`),
 };
 
 export const settingsApi = {

@@ -100,13 +100,20 @@ export const InterviewSessionPage: React.FC = () => {
 
   const handleEndInterview = async () => {
     if (!id || isCompleting) return;
+    if (answeredQuestionsCount === 0) {
+      if (window.confirm("You haven't submitted any answers yet. Exit interview without generating a report?")) {
+        navigate('/interview-coach');
+      }
+      return;
+    }
     setIsCompleting(true);
     try {
       await interviewsApi.complete(id);
       dispatch(addToast({ type: 'success', message: 'Interview completed! Final report ready.' }));
       navigate('/interview/history');
     } catch (err: any) {
-      dispatch(addToast({ type: 'error', message: 'Failed to finalize interview report.' }));
+      const msg = err.response?.data?.detail || 'Failed to finalize interview report.';
+      dispatch(addToast({ type: 'error', message: msg }));
     } finally {
       setIsCompleting(false);
     }

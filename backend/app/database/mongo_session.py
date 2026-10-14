@@ -6,7 +6,7 @@ Provides complete db.query(Model), filter, order_by, limit, add, commit, delete,
 
 import logging
 from typing import Any, Dict, List, Optional, Type, Union
-from datetime import datetime
+from datetime import datetime, date
 import json
 import uuid
 
@@ -274,16 +274,41 @@ class MongoSession:
         self._staged_deletes.clear()
 
     def _instance_to_dict(self, inst: Any) -> Dict[str, Any]:
-        """Converts model instance to MongoDB document dict."""
+        """Converts model instance to MongoDB document dict safely."""
         data = {}
         for k, v in inst.__dict__.items():
-            if k.startswith("_sa_"):
+            # Exclude private/internal attributes (_mongo_session, _sa_instance_state, etc.)
+            if k.startswith("_") and k != "_id":
                 continue
-            # Serialize datetimes to ISO strings or datetime objects
-            if isinstance(v, datetime):
+            # Exclude model relationship instances and sessions
+            if hasattr(v, "_sa_instance_state") or hasattr(v, "_mongo_session") or hasattr(v, "__tablename__"):
+                continue
+            if callable(v) or v.__class__.__name__ == "MongoSession":
+                continue
+            # Serialize datetimes to ISO strings
+            if isinstance(v, (datetime, date)):
                 data[k] = v.isoformat()
-            else:
+            elif isinstance(v, (str, int, float, bool, bytes, type(None))):
                 data[k] = v
+            elif isinstance(v, (list, tuple)):
+                data[k] = [
+                    item.isoformat() if isinstance(item, (datetime, date))
+                    else item
+                    for item in v
+                    if not (hasattr(item, "_sa_instance_state") or hasattr(item, "_mongo_session") or hasattr(item, "__tablename__") or item.__class__.__name__ == "MongoSession")
+                ]
+            elif isinstance(v, dict):
+                data[k] = {
+                    dk: (dv.isoformat() if isinstance(dv, (datetime, date)) else dv)
+                    for dk, dv in v.items()
+                    if not (hasattr(dv, "_sa_instance_state") or hasattr(dv, "_mongo_session") or hasattr(dv, "__tablename__") or dv.__class__.__name__ == "MongoSession")
+                }
+            else:
+                try:
+                    json.dumps(v)
+                    data[k] = v
+                except Exception:
+                    pass
         # Ensure ID exists
         if "id" not in data or not data["id"]:
             data["id"] = str(uuid.uuid4())

@@ -1,21 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../store';
+import { useAppSelector, useAppDispatch } from '../store';
+import { addToast } from '../store/uiSlice';
 import { dashboardApi } from '../services/api';
 import { DashboardStats } from '../types';
 import { ScoreGauge } from '../components/ScoreGauge';
 import {
   Mic, FileText, FileSearch, Target, Award, Compass,
   TrendingUp, Sparkles, CheckCircle2, ArrowRight,
-  Clock, Plus, AlertCircle, BarChart3, ShieldCheck
+  Clock, Plus, AlertCircle, BarChart3, ShieldCheck,
+  Trash2, X, Loader2
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isClearingActivities, setIsClearingActivities] = useState(false);
+  const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -31,6 +36,40 @@ export const Dashboard: React.FC = () => {
       setError(err.response?.data?.detail || 'Failed to load dashboard metrics.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleClearAllActivities = async () => {
+    if (!window.confirm('Are you sure you want to clear your recent activity history?')) return;
+    setIsClearingActivities(true);
+    try {
+      await dashboardApi.clearAllActivities();
+      setStats((prev) => prev ? { ...prev, recent_activities: [] } : null);
+      dispatch(addToast({ type: 'info', message: 'Recent activity history cleared.' }));
+    } catch (err: any) {
+      dispatch(addToast({ type: 'error', message: err.response?.data?.detail || 'Failed to clear activity history.' }));
+    } finally {
+      setIsClearingActivities(false);
+    }
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    setDeletingActivityId(activityId);
+    try {
+      await dashboardApi.deleteActivity(activityId);
+      setStats((prev) =>
+        prev
+          ? {
+              ...prev,
+              recent_activities: prev.recent_activities.filter((a) => a.id !== activityId),
+            }
+          : null
+      );
+      dispatch(addToast({ type: 'info', message: 'Activity removed.' }));
+    } catch (err: any) {
+      dispatch(addToast({ type: 'error', message: err.response?.data?.detail || 'Failed to remove activity.' }));
+    } finally {
+      setDeletingActivityId(null);
     }
   };
 
@@ -346,25 +385,64 @@ export const Dashboard: React.FC = () => {
 
           {/* Recent Chronological Database Activities */}
           <div className="p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#1E293B] shadow-sm">
-            <h4 className="text-sm font-bold text-[#0F172A] dark:text-white flex items-center gap-2 mb-4">
-              <Clock className="w-4 h-4 text-[#2563EB] dark:text-[#38BDF8]" />
-              <span>Recent Activity</span>
-            </h4>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#2563EB] dark:text-[#38BDF8]" />
+                <span>Recent Activity</span>
+              </h4>
+              {stats?.recent_activities && stats.recent_activities.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllActivities}
+                  disabled={isClearingActivities}
+                  className="px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 bg-slate-100 hover:bg-rose-50 dark:bg-slate-800/80 dark:hover:bg-rose-950/40 rounded-lg border border-slate-200 dark:border-slate-700/80 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Clear all recent activity history"
+                >
+                  {isClearingActivities ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3 h-3" />
+                  )}
+                  <span>{isClearingActivities ? 'Clearing...' : 'Clear All'}</span>
+                </button>
+              )}
+            </div>
 
             {stats?.recent_activities && stats.recent_activities.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {stats.recent_activities.map((act, idx) => (
-                  <div key={idx} className="flex items-start gap-3 text-xs">
-                    <div className="w-2 h-2 rounded-full bg-[#2563EB] dark:bg-[#38BDF8] mt-1.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[#0F172A] dark:text-slate-200 font-medium truncate">{act.title}</p>
-                      <span className="text-[10px] text-[#64748B] dark:text-slate-400">
-                        {act.badge} •{' '}
-                        {act.timestamp
-                          ? new Date(act.timestamp).toLocaleDateString()
-                          : 'Recent'}
-                      </span>
+                  <div
+                    key={act.id || idx}
+                    className="group flex items-center justify-between gap-2.5 text-xs p-2 -mx-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition border border-transparent hover:border-slate-200/60 dark:hover:border-slate-700/50"
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="w-2 h-2 rounded-full bg-[#2563EB] dark:bg-[#38BDF8] mt-1.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[#0F172A] dark:text-slate-200 font-medium truncate">{act.title}</p>
+                        <span className="text-[10px] text-[#64748B] dark:text-slate-400">
+                          {act.badge} •{' '}
+                          {act.timestamp
+                            ? new Date(act.timestamp).toLocaleDateString()
+                            : 'Recent'}
+                        </span>
+                      </div>
                     </div>
+                    {act.id && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteActivity(act.id!)}
+                        disabled={deletingActivityId === act.id}
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:text-slate-500 dark:hover:text-rose-400 p-1 rounded-lg transition cursor-pointer shrink-0 disabled:opacity-50"
+                        title="Delete this activity"
+                        aria-label="Delete this activity"
+                      >
+                        {deletingActivityId === act.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <X className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

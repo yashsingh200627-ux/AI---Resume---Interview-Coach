@@ -9,6 +9,7 @@ import {
   Award, Plus, Trash2, Save, Loader2, Link as LinkIcon,
   CheckCircle2, Circle, Sparkles, Phone, Target
 } from 'lucide-react';
+import { PhoneInputField } from '../components/PhoneInputField';
 
 export const ProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -401,17 +402,14 @@ export const ProfilePage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Phone Number</label>
-              <input
-                type="tel"
+              <PhoneInputField
+                label="Phone Number"
                 value={profileData?.user.phone || ''}
-                onChange={(e) =>
+                onChange={(val) =>
                   setProfileData((prev) =>
-                    prev ? { ...prev, user: { ...prev.user, phone: e.target.value } } : null
+                    prev ? { ...prev, user: { ...prev.user, phone: val } } : null
                   )
                 }
-                placeholder="+1 (555) 019-2834"
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div>

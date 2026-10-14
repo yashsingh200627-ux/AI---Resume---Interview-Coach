@@ -7,6 +7,7 @@ import {
   FileText, Sparkles, Download, Save, RefreshCw, Wand2,
   Eye, Edit3, Plus, Trash2, CheckCircle2, Loader2, ArrowRight
 } from 'lucide-react';
+import { PhoneInputField } from '../components/PhoneInputField';
 
 export const ResumeBuilderPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -352,17 +353,17 @@ export const ResumeBuilderPage: React.FC = () => {
                   }
                   className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                 />
-                <input
-                  type="text"
-                  placeholder="Phone"
+                <PhoneInputField
+                  compact
+                  label=""
+                  placeholder="Phone Number"
                   value={content?.personal_info?.phone || ''}
-                  onChange={(e) =>
+                  onChange={(val) =>
                     setContent({
                       ...content,
-                      personal_info: { ...content.personal_info, phone: e.target.value },
+                      personal_info: { ...content.personal_info, phone: val },
                     })
                   }
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                 />
                 <input
                   type="text"

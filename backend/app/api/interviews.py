@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
@@ -13,6 +14,8 @@ from app.schemas.schemas import (
 from app.services.auth_service import get_current_user
 from app.ai.interview_ai import InterviewAIService
 from app.ai.provider import AIProviderException
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/interviews", tags=["AI Interview Coach"])
 
@@ -307,10 +310,9 @@ async def complete_interview(
             difficulty=session.difficulty,
             qa_history=qa_list
         )
-    except AIProviderException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate final report: {str(e)}")
+        logger.error(f"Error during report generation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to synthesize interview report.")
 
     session.status = "completed"
     session.overall_score = report_data["overall_score"]
@@ -324,10 +326,11 @@ async def complete_interview(
     session.recommended_practice = report_data.get("recommended_practice", [])
     session.final_report = report_data.get("final_report", "")
     
+    db.add(session)
     db.commit()
     db.refresh(session)
 
-    return session
+    return get_interview_session(id=session.id, current_user=current_user, db=db)
 
 @router.get("/history", response_model=List[InterviewSessionDetail])
 def get_interview_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
