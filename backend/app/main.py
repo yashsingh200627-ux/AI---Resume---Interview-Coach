@@ -15,7 +15,7 @@ from app.ai.provider import AIProviderException
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize MongoDB connection lo& indexes
+    # Initialize MongoDB connection & indexes
     init_db()
     from app.database.mongodb import mongodb_manager
     if mongodb_manager.is_connected:
@@ -33,12 +33,21 @@ app = FastAPI(
 
 # CORS setup
 origins = [
-"https://ai-resume-interview-coach-eight.vercel.app",
-"http://localhost:5173",
+    "https://ai-resume-interview-coach-eight.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
+
+frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
+if frontend_url and frontend_url not in origins:
+    origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,6 +62,7 @@ async def ai_provider_exception_handler(request: Request, exc: AIProviderExcepti
 
 # Include Routers with /api prefix
 app.include_router(auth.router, prefix="/api")
+app.include_router(auth.router)  # Fallback for clients calling /auth/login or /auth/register directly
 app.include_router(profile.router, prefix="/api")
 app.include_router(resumes.router, prefix="/api")
 app.include_router(resume_analysis.router, prefix="/api")

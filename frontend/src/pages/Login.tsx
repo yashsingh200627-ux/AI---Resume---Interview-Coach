@@ -45,7 +45,13 @@ export const Login: React.FC = () => {
     } catch (err: any) {
       let msg = 'Invalid email or password.';
       if (!err.response) {
-        msg = 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8000.';
+        if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+          msg = 'Connection timed out. The cloud server may be waking up from standby (takes ~30-60s on free tier). Please retry shortly.';
+        } else {
+          msg = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8000.'
+            : 'Unable to reach backend service. The cloud server may be spinning up from standby. Please retry in 30 seconds.';
+        }
       } else if (err.response?.data?.detail) {
         msg = typeof err.response.data.detail === 'string'
           ? err.response.data.detail

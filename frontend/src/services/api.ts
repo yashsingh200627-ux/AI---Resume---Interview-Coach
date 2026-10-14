@@ -4,10 +4,21 @@ import {
   JobMatch, InterviewSession, STARAnalysisResult, DashboardStats, SettingsStatus
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://ai-resume-interview-coach-1-rovp.onrender.com/api.';
+const sanitizeApiUrl = (url?: string): string => {
+  const fallback = 'https://ai-resume-interview-coach-1-rovp.onrender.com/api';
+  const raw = (url && url.trim().length > 0) ? url.trim() : fallback;
+  let clean = raw.replace(/[\.\/\s]+$/, '');
+  if (!clean.endsWith('/api')) {
+    clean = `${clean}/api`;
+  }
+  return clean;
+};
+
+const API_BASE_URL = sanitizeApiUrl(import.meta.env.VITE_API_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 35000,
   headers: {
     'Content-Type': 'application/json',
   },
