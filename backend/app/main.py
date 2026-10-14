@@ -15,7 +15,7 @@ from app.ai.provider import AIProviderException
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize MongoDB connection & indexes
+    # Initialize MongoDB connection lo& indexes
     init_db()
     from app.database.mongodb import mongodb_manager
     if mongodb_manager.is_connected:
@@ -33,12 +33,9 @@ app = FastAPI(
 
 # CORS setup
 origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    settings.FRONTEND_URL
+"https://ai-resume-interview-coach-eight.vercel.app",
+"http://localhost:5173",
 ]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
